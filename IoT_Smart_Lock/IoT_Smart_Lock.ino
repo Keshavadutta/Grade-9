@@ -1,93 +1,75 @@
+#include <AdafruitIO_WiFi.h> // Library to connect Adafruit IO with WiFi
+#include <WiFi.h> // ESP32 WiFi library
 #include <ESP32Servo.h>
 #include <SPI.h>
 #include <MFRC522.h>
-#include "AdafruitIO_WiFi.h"
 
-// RFID Pins
+#define RST_PIN 27
 #define SS_PIN 5
-#define RST_PIN 22
 
-MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
+/******** Adafruit IO Config ***********/
+#define IO_USERNAME "Akhilk12"    // Replace with your Adafruit IO username
+#define IO_KEY "aio_kmcT63S4IDnIK5dPBHrHHMLLyd9c" // Replace with your Adafruit IO key
 
-// Servo setup
-Servo myservo;
-
-// Adafruit IO credentials
-#define IO_USERNAME  "your_username"    // Replace with your Adafruit IO username
-#define IO_KEY       "your_aio_key"     // Replace with your Adafruit IO Key
-
-// Wi-Fi credentials
-#define WIFI_SSID    "your_wifi_ssid"   // Replace with your Wi-Fi SSID
-#define WIFI_PASS    "your_wifi_password" // Replace with your Wi-Fi password
+/******** WiFi Config **************/
+#define WIFI_SSID "Abcd"          // Your WiFi SSID
+#define WIFI_PASS "a#@7812Aa"  
 
 AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
 
-// Create a feed called "servo-password" in Adafruit IO
-AdafruitIO_Feed *servo_password = io.feed("servo-password");
+// Set up the Adafruit IO feed for servo control
+AdafruitIO_Feed *control_servo_feed = io.feed("smart_door");
+MFRC522 mfrc522(SS_PIN, RST_PIN); // Create MFRC522 instance
+Servo myservo;
 
-// Correct password and authorized RFID UID
-String correct_password = "1234";               // Replace with correct password
-String authorizedUID = "10 18 C9 1A";           // Replace with the authorized RFID tag (UID in HEX)
+int lock_status = LOW; // Door lock status: LOW = locked, HIGH = unlocked
+const String AUTHORIZED_UID = "30 9B BB 5D"; // Authorized UID
 
-// Function declarations
-void handlePasswordInput(AdafruitIO_Data *data);
-void checkRFID();
+// Function to lock the door
+void lockDoor() {
+  myservo.write(0); // Servo to locked position
+  lock_status = LOW;
+  Serial.println("Door Locked.");
+}
+
+// Function to unlock the door
+void unlockDoor() {
+  myservo.write(90); // Servo to unlocked position
+  lock_status = HIGH;
+  Serial.println("Door Unlocked.");
+}
 
 void setup() {
-  Serial.begin(115200);
-  
-  // Connect to Wi-Fi
-  Serial.print("Connecting to Wi-Fi...");
+  Serial.begin(9600); // Start the serial connection
+  delay(2000);
+  Serial.println();
+
+  //-----------------------------------------------------
+  SPI.begin(); // Initiate SPI bus
+  mfrc522.PCD_Init(); // Initiate MFRC522
+
+  // Connect to Adafruit IO
+  Serial.print("Connecting to Adafruit IO");
   io.connect();
-  
-  // Wait for the connection
+
+  myservo.attach(12); // Attach servo to pin 12
+  lockDoor(); // Ensure the door starts in the locked position
+
+  //------------------------------------------------------
+  control_servo_feed->onMessage(handleMessage);
+
+  // Wait for a connection to Adafruit IO
   while(io.status() < AIO_CONNECTED) {
     Serial.print(".");
     delay(500);
   }
   Serial.println();
   Serial.println("Connected to Adafruit IO!");
-
-  // Initialize SPI bus and MFRC522
-  SPI.begin();
-  mfrc522.PCD_Init();
-
-  Serial.println("Present your RFID card or enter password from the cloud...");
-
-  // Attach the servo to pin 12 and set to initial position
-  myservo.attach(12);
-  myservo.write(0);   // Initialize servo to 0 degrees (locked)
-
-  // Set up a callback for the "servo-password" feed
-  servo_password->onMessage(handlePasswordInput);
 }
 
 void loop() {
-  // Keep the connection to Adafruit IO alive
   io.run();
-  
-  // Check for RFID tags
-  checkRFID();
-}
 
-// Handle password input from Adafruit IO
-void handlePasswordInput(AdafruitIO_Data *data) {
-  String received_password = data->toString();
-
-  Serial.print("Received Password: ");
-  Serial.println(received_password);
-
-  // If the received password matches the correct password
-  if(received_password == correct_password) {
-    Serial.println("Correct password. Unlocking servo...");
-    unlockServo();
-  } else {
-    Serial.println("Incorrect password. Access denied.");
-  }
-}
-
-// Check for RFID tags and match against authorized UID
-void checkRFID() {
   // Look for new cards
   if (!mfrc522.PICC_IsNewCardPresent()) {
     return;
@@ -99,32 +81,45 @@ void checkRFID() {
   }
 
   // Show UID on serial monitor
-  String rfidTag = "";
+  Serial.print("UID tag : ");
+  String content = "";
   for (byte i = 0; i < mfrc522.uid.size; i++) {
-    rfidTag.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
-    rfidTag.concat(String(mfrc522.uid.uidByte[i], HEX));
+    content += String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
+    content += String(mfrc522.uid.uidByte[i], HEX);
   }
-  rfidTag.toUpperCase();
-  
-  Serial.print("UID tag: ");
-  Serial.println(rfidTag);
+  content.trim(); // Remove extra spaces
+  content.toUpperCase(); // Ensure consistency
+  Serial.println(content);
 
-  // Compare the read RFID UID with the authorized UID
-  if (rfidTag.substring(1) == authorizedUID) {
-    Serial.println("Authorized RFID. Unlocking servo...");
-    unlockServo();
+  // Check if the scanned UID matches the authorized UID
+  if (content == AUTHORIZED_UID) {
+    Serial.println("Access Granted.");
+    if (lock_status == LOW) {
+      unlockDoor();
+      delay(5000); // Keep the door unlocked for 5 seconds
+      lockDoor();
+    } else {
+      Serial.println("Door is already unlocked.");
+    }
   } else {
-    Serial.println("Unauthorized RFID.");
+    Serial.println("Access Denied. Unauthorized card.");
   }
 
-  // Halt the PICC and stop encryption on PCD
+  // Halt PICC to stop reading
   mfrc522.PICC_HaltA();
-  mfrc522.PCD_StopCrypto1();
 }
 
-// Function to unlock the servo
-void unlockServo() {
-  myservo.write(90);   // Move servo to 90 degrees (open)
-  delay(3000);         // Wait for 3 seconds
-  myservo.write(0);    // Move servo back to 0 degrees (locked)
+// Function to handle received feed data
+void handleMessage(AdafruitIO_Data *data) {
+  // Print the received value (on/off) to the Serial Monitor
+  Serial.print("Received: ");
+  Serial.println(data->value());
+
+  if (data->toInt() == 1) { 
+    // If the IoT dashboard sends a HIGH signal (switch ON)
+    myservo.write(90); // Set the servo to 90 degrees
+  } else { 
+    // If the IoT dashboard sends a LOW signal (switch OFF)
+    myservo.write(0); // Set the servo to 0 degrees
+  }
 }
