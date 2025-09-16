@@ -13,7 +13,7 @@
 
 /******** WiFi Config **************/
 #define WIFI_SSID "Abcd"          // Your WiFi SSID
-#define WIFI_PASS "a#@7812Aa"  
+#define WIFI_PASS "a#@2Aa"  
 
 AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
 
@@ -123,3 +123,4 @@ void handleMessage(AdafruitIO_Data *data) {
     myservo.write(0); // Set the servo to 0 degrees
   }
 }
+
