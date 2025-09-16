@@ -2,13 +2,13 @@
 #include <WiFi.h> // ESP32 WiFi library
 #include <ESP32Servo.h> //ESP32 Servo library
 /******** Adafruit IO Config ***********/
-#define IO_USERNAME "Akhilk12"    // Replace with your Adafruit IO username
-#define IO_KEY "aio_rKXa802KBAt597Ussrj4ExEnlNH4" // Replace with your Adafruit IO key
+#define IO_USERNAME "Akhlk12"    // Replace with your Adafruit IO username
+#define IO_KEY "aio_rKXa802KBUssrj4ExEnlNH4" // Replace with your Adafruit IO key
 
 
 /******** WiFi Config **************/
 #define WIFI_SSID "Abcd"          // Your WiFi SSID
-#define WIFI_PASS "a#@7812Aa"     // Your Password
+#define WIFI_PASS "a#@12Aa"     // Your Password
 
 
 Servo myservo;
@@ -48,3 +48,4 @@ void handleMessage(AdafruitIO_Data *data) {
  int angle = constrain(data->toInt(), 0, 180); // Ensure the angle is between 0 and 180
  myservo.write(angle); // Set servo position
 } 
+
