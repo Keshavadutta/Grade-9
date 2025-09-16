@@ -1,36 +1,89 @@
 #include <SPI.h>
 #include <MFRC522.h>
 
-#define SS_PIN 5   // SDA
-#define RST_PIN 22 // Reset
-MFRC522 mfrc522(SS_PIN, RST_PIN); // Create MFRC522 instance
+#define SS_PIN 5
+#define RST_PIN 27
 
-void setup() {
-  Serial.begin(9600);   // Initialize serial communications
-  SPI.begin();          // Init SPI bus
-  mfrc522.PCD_Init();   // Init MFRC522
-  Serial.println("Approximate your card to the reader...");
+MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
+
+// Init array that will store new NUID 
+byte nuidPICC[4];
+
+void setup() { 
+  Serial.begin(9600);
+  SPI.begin(); // Init SPI bus
+  rfid.PCD_Init(); // Init MFRC522 
+
+  Serial.println(F("This code scan the MIFARE Classic NUID."));
 }
 
 void loop() {
-  // Look for new cards
-  if ( !mfrc522.PICC_IsNewCardPresent()) {
+
+  // Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
+  if (!rfid.PICC_IsNewCardPresent())
+    return;
+
+  // Verify if the NUID has been read
+  if (!rfid.PICC_ReadCardSerial())
+    return;
+
+  Serial.print(F("PICC type: "));
+  MFRC522::PICC_Type piccType = rfid.PICC_GetType(rfid.uid.sak);
+  Serial.println(rfid.PICC_GetTypeName(piccType));
+
+  // Check if the PICC is of Classic MIFARE type
+  if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&  
+      piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
+      piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
+    Serial.println(F("Your tag is not of type MIFARE Classic."));
     return;
   }
 
-  // Select one of the cards
-  if ( !mfrc522.PICC_ReadCardSerial()) {
-    return;
+  if (rfid.uid.uidByte[0] != nuidPICC[0] || 
+      rfid.uid.uidByte[1] != nuidPICC[1] || 
+      rfid.uid.uidByte[2] != nuidPICC[2] || 
+      rfid.uid.uidByte[3] != nuidPICC[3]) {
+    Serial.println(F("A new card has been detected."));
+
+    // Store NUID into nuidPICC array
+    for (byte i = 0; i < 4; i++) {
+      nuidPICC[i] = rfid.uid.uidByte[i];
+    }
+   
+    Serial.println(F("The NUID tag is:"));
+    Serial.print(F("In hex: "));
+    printHex(rfid.uid.uidByte, rfid.uid.size);
+    Serial.println();
+    Serial.print(F("In dec: "));
+    printDec(rfid.uid.uidByte, rfid.uid.size);
+    Serial.println();
+  } else {
+    Serial.println(F("Card read previously."));
   }
 
-  // Print card UID (even if not MIFARE Classic)
-  Serial.print("Card UID: ");
-  for (byte i = 0; i < mfrc522.uid.size; i++) {
-    Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
-    Serial.print(mfrc522.uid.uidByte[i], HEX);
-  }
-  Serial.println();
+  // Halt PICC
+  rfid.PICC_HaltA();
 
-  // Halt PICC (stop reading the card)
-  mfrc522.PICC_HaltA();
+  // Stop encryption on PCD
+  rfid.PCD_StopCrypto1();
+}
+
+/**
+ * Helper routine to dump a byte array as hex values to Serial. 
+ */
+void printHex(byte *buffer, byte bufferSize) {
+  for (byte i = 0; i < bufferSize; i++) {
+    Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+    Serial.print(buffer[i], HEX);
+  }
+}
+
+/**
+ * Helper routine to dump a byte array as dec values to Serial.
+ */
+void printDec(byte *buffer, byte bufferSize) {
+  for (byte i = 0; i < bufferSize; i++) {
+    Serial.print(' ');
+    Serial.print(buffer[i], DEC);
+  }
 }
