@@ -1,66 +1,50 @@
-#include <ESP32Servo.h>
-#include "AdafruitIO_WiFi.h"
+#include <AdafruitIO_WiFi.h> // Library to connect Adafruit IO with WiFi
+#include <WiFi.h> // ESP32 WiFi library
+#include <ESP32Servo.h> //ESP32 Servo library
+/******** Adafruit IO Config ***********/
+#define IO_USERNAME "Akhilk12"    // Replace with your Adafruit IO username
+#define IO_KEY "aio_rKXa802KBAt597Ussrj4ExEnlNH4" // Replace with your Adafruit IO key
 
-// Adafruit IO credentials
-#define IO_USERNAME  "your_username"   // Replace with your Adafruit IO username
-#define IO_KEY       "your_aio_key"    // Replace with your Adafruit IO Key
 
-// Wi-Fi credentials
-#define WIFI_SSID    "your_wifi_ssid"  // Replace with your Wi-Fi SSID
-#define WIFI_PASS    "your_wifi_password" // Replace with your Wi-Fi password
+/******** WiFi Config **************/
+#define WIFI_SSID "Abcd"          // Your WiFi SSID
+#define WIFI_PASS "a#@7812Aa"     // Your Password
 
-AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
-
-// Create a feed called "servo-password"
-AdafruitIO_Feed *servo_password = io.feed("servo-password");
 
 Servo myservo;
-int pos = 0;
-String correct_password = "1234";  // Set the correct password
-
+/******** Adafruit IO Setup ************/
+AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
+// Set up the Adafruit IO feed for LED control
+AdafruitIO_Feed *control_servo_feed = io.feed("Servo");
 void setup() {
-  Serial.begin(115200);
+ // Start the serial connection
+ Serial.begin(115200);
+ myservo.attach(12); // Attach servo to pin 12
 
-  // Connect to Wi-Fi
-  Serial.print("Connecting to Wi-Fi...");
-  io.connect();
-  
-  // Wait for the connection
-  while(io.status() < AIO_CONNECTED) {
-    Serial.print(".");
-    delay(500);
-  }
-  Serial.println();
-  Serial.println("Connected to Adafruit IO!");
-
-  // Attach the servo to pin 12
-  myservo.attach(12);
-  myservo.write(0);   // Initialize servo to 0 degrees (locked)
-
-  // Set up a callback for the "servo-password" feed
-  servo_password->onMessage(handlePasswordInput);
+ // Connect to Adafruit IO
+ Serial.print("Connecting to Adafruit IO");
+ io.connect();
+ // Set up a message handler for when feed data is received
+ control_servo_feed->onMessage(handleMessage);
+ // Wait for a connection to Adafruit IO
+ while(io.status() < AIO_CONNECTED) {
+ Serial.print(".");
+ delay(500);
+ }
+ // We’re connected!
+ Serial.println();
+ Serial.println("Connected to Adafruit IO!");
 }
 
 void loop() {
-  // Keep the connection to Adafruit IO alive
-  io.run();
+ // io.run() is required to process Adafruit IO messages
+ io.run();
 }
-
-// Function to handle password input from Adafruit IO
-void handlePasswordInput(AdafruitIO_Data *data) {
-  String received_password = data->toString();
-
-  // Print received password for debugging
-  Serial.print("Received Password: ");
-  Serial.println(received_password);
-
-  // Check if the received password matches the correct password
-  if(received_password == correct_password) {
-    Serial.println("Correct password. Servo unlocking...");
-    myservo.write(90);   // Move servo to 90 degrees (open)
-    delay(3000);         // Wait for 3 seconds
-    myservo.write(0);    // Move servo back to 0 degrees (locked)
-  } else {
-    Serial.println("Incorrect password. Access denied.");
-  }
-}
+// Function to handle received feed data
+void handleMessage(AdafruitIO_Data *data) {
+ // Print the received value (on/off) to the Serial Monitor
+ Serial.print("Received: ");
+ Serial.println(data->value());
+ int angle = constrain(data->toInt(), 0, 180); // Ensure the angle is between 0 and 180
+ myservo.write(angle); // Set servo position
+} 
