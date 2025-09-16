@@ -1,23 +1,24 @@
-#include <ESP32Servo.h> // Include the ESP32Servo library
-
-Servo myServo;          // Create a servo object to control the servo motor
-int servoPin = 15;      // Define the GPIO pin where the servo is connected
-int angle = 0;          // Variable to store the servo angle
+#include <ESP32Servo.h>
+Servo myservo;
+int pos = 0; // store servo angle
 
 void setup() {
-  myServo.attach(servoPin);  // Attach the servo to the defined GPIO pin
+  Serial.begin(9600);
+  myservo.attach(12); // Servo connected to GPIO 12
+  Serial.println("Start Servo");
+  Serial.print("Angle = 90 deg");
+  myservo.write(90); // Move to center position
+  Serial.println("Fix small gear");
+  delay(3000);
 }
 
 void loop() {
-  // Sweep the servo from 0 to 180 degrees
-  for (angle = 0; angle <= 180; angle++) {
-    myServo.write(angle);   // Move the servo to the specified angle
-    delay(15);              // Wait for 15ms to allow the servo to reach the position
+  for (pos = 0; pos <= 180; pos++) {
+    myservo.write(pos);
+    delay(15);
   }
-
-  // Sweep the servo back from 180 to 0 degrees
-  for (angle = 180; angle >= 0; angle--) {
-    myServo.write(angle);   // Move the servo back to the specified angle
-    delay(15);              // Wait for 15ms to allow the servo to reach the position
+  for (pos = 180; pos >= 0; pos--) {
+    myservo.write(pos);
+    delay(15);
   }
 }
